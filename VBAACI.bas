@@ -20,15 +20,15 @@ Dim token As String, aux As String, i
         ACIrequest.Body = "{""aaaUser"" : {""attributes"" : {""name"" : """ & Username & """, ""pwd"" : """ & Password & """}}}"
         ACIrequest.SetHeader "Content-Type", "application/json"
         'Send request and store response
-        Dim Response As WebResponse
-        Set Response = ACIclient.Execute(ACIrequest)
-        If Not Response.StatusCode = 200 Then
-            MsgBox "Error in authentication: " & Response.StatusCode & " - " & Response.StatusDescription
+        Dim response As WebResponse
+        Set response = ACIclient.Execute(ACIrequest)
+        If Not response.StatusCode = 200 Then
+            MsgBox "Error in authentication: " & response.StatusCode & " - " & response.StatusDescription
             Exit Function
         End If
         'Get cookie
         Dim Json As Object
-        Set Json = JsonConverter.ParseJson(Response.Content)
+        Set Json = JsonConverter.ParseJson(response.Content)
         token = JsonConverter.ConvertToJson(Json("imdata").Item(1)("aaaLogin")("attributes")("token"))
         'Strip double quotes from response (first and last character)
         token = Mid(token, 2, Len(token) - 2)
@@ -56,9 +56,9 @@ Dim Name As String, Id As String, JSONpreview As Boolean
         ACIrequest.SetHeader "Cookie", "APIC-cookie=" & token
         ACIrequest.SetHeader "Content-Type", "application/json"
         'Send request
-        Dim Response As WebResponse
-        Set Response = ACIclient.Execute(ACIrequest)
-        If Not Response.StatusCode = 200 Then
+        Dim response As WebResponse
+        Set response = ACIclient.Execute(ACIrequest)
+        If Not response.StatusCode = 200 Then
             SendACIPOST = False
         Else
             SendACIPOST = True
@@ -78,14 +78,14 @@ Function ObjectExists(token As String, Resource As String) As Boolean
         ACIrequest.SetHeader "Cookie", "APIC-cookie=" & token
         ACIrequest.SetHeader "Content-Type", "application/json"
         'Send request
-        Dim Response As New WebResponse
-        Set Response = ACIclient.Execute(ACIrequest)
-        If Not Response.StatusCode = 200 Then
-            MsgBox "Error checking for object: " & Response.StatusCode & " - " & Response.StatusDescription, vbCritical
+        Dim response As New WebResponse
+        Set response = ACIclient.Execute(ACIrequest)
+        If Not response.StatusCode = 200 Then
+            MsgBox "Error checking for object: " & response.StatusCode & " - " & response.StatusDescription, vbCritical
         Else
             'Process answer
             Dim Json As Object
-            Set Json = JsonConverter.ParseJson(Response.Content)
+            Set Json = JsonConverter.ParseJson(response.Content)
             ObjectExists = (Mid(JsonConverter.ConvertToJson(Json("totalCount")), 2, 1) > 0)
         End If
 End Function
@@ -117,13 +117,18 @@ Dim Resource As String, errmsg As String, Body As String
 End Function
 
 Function ConfigurePort(token As String, intprofile As String, servername As String, port As String, policy As String)
+'APIC Inspector v2.0
+'method: Post
+'url: http://muc-apic/api/node/mo/uni/infra/accportprof-203/hports-test-api-inspector-typ-range.json
+'payload{"infraHPortS":{"attributes":{"dn":"uni/infra/accportprof-203/hports-test-api-inspector-typ-range","name":"test-api-inspector","rn":"hports-test-api-inspector-typ-range","status":"created,modified"},"children":[{"infraPortBlk":{"attributes":{"dn":"uni/infra/accportprof-203/hports-test-api-inspector-typ-range/portblk-block2","fromPort":"28","toPort":"28","name":"block2","rn":"portblk-block2","status":"created,modified"},"children":[]}},{"infraRsAccBaseGrp":{"attributes":{"tDn":"uni/infra/funcprof/accbundle-Test1234","status":"created,modified"},"children":[]}}]}}
+'response: {"totalCount":"0","imdata":[]}
 Dim Resource As String, errmsg As String, Body As String
         Resource = "node/mo/uni/infra/accportprof-" & intprofile & "/hports-test-typ-range.json"
         Body = "{""infraHPortS"":{""attributes"":{""dn"":""uni/infra/accportprof-" & intprofile & "/hports-" & servername & "-typ-range""," _
         & """name"":""" & servername & """,""rn"":""hports-" & servername & "-typ-range"",""status"":""created,modified""},""children"":[" _
         & "{""infraPortBlk"":{""attributes"":{""dn"":""uni/infra/accportprof-" & intprofile & "/hports-" & servername & "-typ-range/portblk-block2""," _
         & """fromPort"":""" & port & """,""toPort"":""" & port & """,""name"":""block2"",""rn"":""portblk-block2"",""status"":""created,modified""}," _
-        & """children"":[]}},{""infraRsAccBaseGrp"":{""attributes"":{""tDn"":""uni/infra/funcprof/accportgrp-" & policy & """,""status"":""created,modified""},""children"":[]}}]}}"
+        & """children"":[]}},{""infraRsAccBaseGrp"":{""attributes"":{""tDn"":""uni/infra/funcprof/accbundle-" & policy & """,""status"":""created,modified""},""children"":[]}}]}}"
         errmsg = "Error in configuration request"
         SendPOST token, Resource, Body, errmsg
 End Function
@@ -150,7 +155,7 @@ Dim Resource As String, errmsg As String, Body As String
         & """name"":""" & servername & """,""rn"":""hports-" & servername & "-typ-range"",""status"":""created,modified""},""children"":[{""infraPortBlk"":" _
         & "{""attributes"":{""dn"":""uni/infra/fexprof-" & intprofile & "/hports-" & servername & "-typ-range/portblk-block3"",""fromPort"":""" & port & """," _
         & """toPort"":""" & port & """,""name"":""block3"",""rn"":""portblk-block3"",""status"":""created,modified""},""children"":[]}},{""infraRsAccBaseGrp"":" _
-        & "{""attributes"":{""tDn"":""uni/infra/funcprof/accportgrp-" & policy & """,""status"":""created,modified""},""children"":[]}}]}}"
+        & "{""attributes"":{""tDn"":""uni/infra/funcprof/accbundle-" & policy & """,""status"":""created,modified""},""children"":[]}}]}}"
         errmsg = "Error in request to add ifselector for " & servername & " on FEX " & intprofile & ", port " & port
         SendPOST token, Resource, Body, errmsg
 End Function
@@ -204,11 +209,13 @@ Dim Resource As String, errmsg As String, Body As String
 End Function
 
 Function AddStaticBinding(token As String, tenant As String, anp As String, epg As String, switch, port, vlanid, native As Boolean)
+'APIC Inspector v1.x
 'url: http://muc-apic/api/node/mo/uni/tn-Acme/ap-MyApp1/epg-Tier1.json
 'Tagged:
 'payload: {"fvRsPathAtt":{"attributes":{"encap":"vlan-1098","instrImedcy":"immediate","tDn":"topology/pod-1/paths-201/pathep-[eth1/15]","status":"created"},"children":[]}}
 'Untagged:
 'payload: {"fvRsPathAtt":{"attributes":{"encap":"vlan-1097","mode":"untagged","tDn":"topology/pod-1/paths-201/pathep-[eth1/18]","status":"created"},"children":[]}}
+
 Dim Resource As String, errmsg As String, Body As String
         Resource = "node/mo/uni/tn-" & tenant & "/ap-" & anp & "/epg-" & epg & ".json"
         Body = "{""fvRsPathAtt"":{""attributes"":{""encap"":""vlan-" & vlanid & """,""instrImedcy"":""immediate""," _
@@ -476,7 +483,7 @@ End Function
 Function CreateLLP(token As String, Name As String, neg As Boolean, speed As String)
 'url:Êhttp://muc-apic/api/node/mo/uni/infra/hintfpol-1G_NoNeg.json
 'payload:Ê{"fabricHIfPol":{"attributes":{"dn":"uni/infra/hintfpol-1G_NoNeg","name":"1G_NoNeg","speed":"1G","autoNeg":"off","rn":"hintfpol-1G_NoNeg","status":"created"},"children":[]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/hintfpol-" & Name & ".json"
     Body = "{""fabricHIfPol"":{""attributes"":{""dn"":""uni/infra/hintfpol-" & Name & """,""name"":""" & Name & """,""speed"":""" & speed & """," _
     & """autoNeg"":""" & IIf(neg, "on", "off") & """,""rn"":""hintfpol-" & Name & """,""status"":""created""},""children"":[]}}"
@@ -487,7 +494,7 @@ End Function
 Function CreateCDPP(token As String, Name As String, enabled As Boolean)
 'url: http://muc-apic/api/node/mo/uni/infra/cdpIfP-TEST.json
 'payload: {"cdpIfPol":{"attributes":{"dn":"uni/infra/cdpIfP-TEST","name":"TEST","rn":"cdpIfP-TEST","status":"created"},"children":[]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/cdpIfP-" & Name & ".json"
     Body = "{""cdpIfPol"":{""attributes"":{""dn"":""uni/infra/cdpIfP-" & Name & """,""name"":""" & Name & """,""adminSt"":""" & IIf(enabled, "enabled", "disabled") & """," _
     & """rn"":""cdpIfP-" & Name & """,""status"":""created""},""children"":[]}}"
@@ -496,7 +503,7 @@ Dim Response As WebResponse, Resource As String, Body As String, errmsg As Strin
 End Function
 
 Function CreateLLDPP(token As String, Name As String, enabled As Boolean)
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/lldpIfP-" & Name & ".json"
     Body = "{""lldpIfPol"":{""attributes"":{""dn"":""uni/infra/lldpIfP-" & Name & """,""name"":""" & Name & """,""adminRxSt"":""" & IIf(enabled, "enabled", "disabled") & """," _
     & """adminTxSt"":""" & IIf(enabled, "enabled", "disabled") & """rn"":""lldpIfP-" & Name & """,""status"":""created""},""children"":[]}}"
@@ -507,7 +514,7 @@ End Function
 Function CreateIntPolGroup(token As String, Name As String, llp As String, cdp As String, lldp As String, aep As String)
 'url: http://muc-apic/api/node/mo/uni/infra/funcprof/accportgrp-TEST.json
 'payload: {"infraAccPortGrp":{"attributes":{"dn":"uni/infra/funcprof/accportgrp-TEST","name":"TEST","rn":"accportgrp-TEST","status":"created"},"children":[{"infraRsAttEntP":{"attributes":{"tDn":"uni/infra/attentp-default","status":"created,modified"},"children":[]}},{"infraRsHIfPol":{"attributes":{"tnFabricHIfPolName":"100M_Neg","status":"created,modified"},"children":[]}},{"infraRsCdpIfPol":{"attributes":{"tnCdpIfPolName":"default","status":"created,modified"},"children":[]}},{"infraRsLldpIfPol":{"attributes":{"tnLldpIfPolName":"default","status":"created,modified"},"children":[]}}]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/funcprof/accportgrp-" & Name & ".json"
     Body = "{""infraAccPortGrp"":{""attributes"":{""dn"":""uni/infra/funcprof/accportgrp-" & Name & """,""name"":""" & Name & """,""rn"":""accportgrp-" & Name & """," _
     & """status"":""created""},""children"":[{""infraRsAttEntP"":{""attributes"":{""tDn"":""uni/infra/attentp-" & aep & """,""status"":""created,modified""}," _
@@ -521,7 +528,7 @@ End Function
 Function CreateAAEP(token As String, Name As String)
 'url: http://muc-apic/api/node/mo/uni/infra.json
 'payload: {"infraInfra":{"attributes":{"dn":"uni/infra","status":"modified"},"children":[{"infraAttEntityP":{"attributes":{"dn":"uni/infra/attentp-Zone1","name":"Zone1","rn":"attentp-Zone1","status":"created"},"children":[]}},{"infraFuncP":{"attributes":{"dn":"uni/infra/funcprof","status":"modified"},"children":[]}}]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra.json"
     Body = "{""infraInfra"":{""attributes"":{""dn"":""uni/infra"",""status"":""modified""},""children"":[{""infraAttEntityP"":{""attributes"":{" _
     & """dn"":""uni/infra/attentp-" & Name & """,""name"":""" & Name & """,""rn"":""attentp-" & Name & """,""status"":""created""},""children"":[]}}," _
@@ -533,7 +540,7 @@ End Function
 Function CreateStaticVLANPool(token As String, Name As String, from_vlan As String, to_vlan As String)
 'url: http://muc-apic/api/node/mo/uni/infra/vlanns-[phys]-static.json
 'payload: {"fvnsVlanInstP":{"attributes":{"dn":"uni/infra/vlanns-[phys]-static","name":"phys","allocMode":"static","rn":"vlanns-[phys]-static","status":"created"},"children":[{"fvnsEncapBlk":{"attributes":{"dn":"uni/infra/vlanns-[phys]-static/from-[vlan-1]-to-[vlan-99]","from":"vlan-1","to":"vlan-99","rn":"from-[vlan-1]-to-[vlan-99]","status":"created"},"children":[]}}]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/vlanns-\[" & Name & "\]-static.json"
     Body = "{""fvnsVlanInstP"":{""attributes"":{""dn"":""uni/infra/vlanns-[" & Name & "]-static"",""name"":""" & Name & """,""allocMode"":""static""," _
     & """rn"":""vlanns-[" & Name & "]-static"",""status"":""created""},""children"":[{""fvnsEncapBlk"":{""attributes"":" _
@@ -548,7 +555,7 @@ Function CreateDynamicVLANPool(token As String, Name As String, from_vlan As Str
 'payload{"fvnsVlanInstP":{"attributes":{"dn":"uni/infra/vlanns-[dyntest]-dynamic","name":"dyntest","rn":"vlanns-[dyntest]-dynamic","status":"created"},
 '  "children":[{"fvnsEncapBlk":{"attributes":{"dn":"uni/infra/vlanns-[dyntest]-dynamic/from-[vlan-501]-to-[vlan-502]",
 '  "from":"vlan-501","to":"vlan-502","rn":"from-[vlan-501]-to-[vlan-502]","status":"created"},"children":[]}}]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/vlanns-\[" & Name & "\]-dynamic.json"
     Body = "{""fvnsVlanInstP"":{""attributes"":{""dn"":""uni/infra/vlanns-[" & Name & "]-dynamic"",""name"":""" & Name & """,""allocMode"":""dynamic""," _
     & """rn"":""vlanns-[" & Name & "]-dynamic"",""status"":""created,modified""},""children"":[{""fvnsEncapBlk"":{""attributes"":" _
@@ -561,7 +568,7 @@ End Function
 Function CreatePhysDomain(token As String, Name As String, pool As String)
 'url: http://muc-apic/api/node/mo/uni/phys-Zone1.json
 'payload: {"physDomP":{"attributes":{"dn":"uni/phys-Zone1","name":"Zone1","rn":"phys-Zone1","status":"created"},"children":[{"infraRsVlanNs":{"attributes":{"tDn":"uni/infra/vlanns-[Zone1]-static","status":"created"},"children":[]}}]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/phys-" & Name & ".json"
     Body = "{""physDomP"":{""attributes"":{""dn"":""uni/phys-" & Name & """,""name"":""" & Name & """,""rn"":""phys-" & Name & """,""status"":""created""}," _
     & """children"":[{""infraRsVlanNs"":{""attributes"":{""tDn"":""uni/infra/vlanns-[" & pool & "]-static"",""status"":""created""},""children"":[]}}]}}"
@@ -572,7 +579,7 @@ End Function
 Function AddPhysDomainToAEP(token As String, domain As String, aep As String)
 'url: http://muc-apic/api/node/mo/uni/infra/attentp-Zone1.json
 'payload: {"infraRsDomP":{"attributes":{"tDn":"uni/phys-Zone2","status":"created,modified"},"children":[]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/attentp-" & aep & ".json"
     Body = "{""infraRsDomP"":{""attributes"":{""tDn"":""uni/phys-" & domain & """,""status"":""created,modified""},""children"":[]}}"
     errmsg = "Error assigning physical domain " & domain & " to AEP " & aep
@@ -582,7 +589,7 @@ End Function
 Function AddVMMDomainToAEP(token As String, domain As String, aep As String)
 'url: http://muc-apic/api/node/mo/uni/infra/attentp-default.json
 'payload{"infraRsDomP":{"attributes":{"tDn":"uni/vmmp-VMware/dom-testJose","status":"created"},"children":[]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/infra/attentp-" & aep & ".json"
     Body = "{""infraRsDomP"":{""attributes"":{""tDn"":""uni/vmmp-VMware/dom-" & domain & """,""status"":""created,modified""},""children"":[]}}"
     errmsg = "Error assigning virtual domain " & domain & " to AEP " & aep
@@ -592,7 +599,7 @@ End Function
 Function AddPhysDomainToEPG(token As String, domain As String, tenant As String, anp As String, epg As String)
 'url: http://muc-apic/api/node/mo/uni/tn-common/ap-default/epg-VLAN1.json
 'payload: {"fvRsDomAtt":{"attributes":{"instrImedcy":"immediate","resImedcy":"immediate","tDn":"uni/phys-default","status":"created"},"children":[]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/tn-" & tenant & "/ap-" & anp & "/epg-" & epg & ".json"
     Body = "{""fvRsDomAtt"":{""attributes"":{""instrImedcy"":""immediate"",""resImedcy"":""immediate"",""tDn"":""uni/phys-" & domain & """,""status"":""created,modified""},""children"":[]}}"
     errmsg = "Error assigning physical domain " & domain & " to EPG " & tenant & "/" & anp & "/" & epg
@@ -602,7 +609,7 @@ End Function
 Function AddVirtDomainToEPG(token As String, domain As String, tenant As String, anp As String, epg As String)
 'url: http://muc-apic/api/node/mo/uni/tn-Pod2/ap-Pod2/epg-EPG2.json
 'payload{"fvRsDomAtt":{"attributes":{"resImedcy":"immediate","instrImedcy":"immediate","tDn":"uni/vmmp-VMware/dom-ACI-vCenter-VDS","status":"created"},"children":[{"vmmSecP":{"attributes":{"status":"created"},"children":[]}}]}}
-Dim Response As WebResponse, Resource As String, Body As String, errmsg As String
+Dim response As WebResponse, Resource As String, Body As String, errmsg As String
     Resource = "node/mo/uni/tn-" & tenant & "/ap-" & anp & "/epg-" & epg & ".json"
     Body = "{""fvRsDomAtt"":{""attributes"":{""instrImedcy"":""immediate"",""resImedcy"":""immediate"",""tDn"":""uni/vmmp-VMware/dom-" & domain & """,""status"":""created,modified""},""children"":[]}}"
     errmsg = "Error assigning physical domain " & domain & " to EPG " & tenant & "/" & anp & "/" & epg
@@ -635,15 +642,15 @@ Dim i, aux() As String
         ACIrequest.SetHeader "Cookie", "APIC-cookie=" & token
         ACIrequest.SetHeader "Content-Type", "application/json"
         'Send request and store response
-        Dim Response As WebResponse
-        Set Response = ACIclient.Execute(ACIrequest)
-        If Not Response.StatusCode = 200 Then
-            MsgBox "Error getting the node list: " & Response.StatusCode & " - " & Response.StatusDescription
+        Dim response As WebResponse
+        Set response = ACIclient.Execute(ACIrequest)
+        If Not response.StatusCode = 200 Then
+            MsgBox "Error getting the node list: " & response.StatusCode & " - " & response.StatusDescription
             Exit Function
         End If
         'Process response
         Dim Json As Object
-        Set Json = JsonConverter.ParseJson(Response.Content)
+        Set Json = JsonConverter.ParseJson(response.Content)
         For i = 1 To Json("totalCount")
             If Json("imdata").Item(i)("fabricNode")("attributes")("role") = "leaf" Then
                 'MsgBox "Leaf " & Json("imdata").Item(i)("fabricNode")("attributes")("id") & " detected"
